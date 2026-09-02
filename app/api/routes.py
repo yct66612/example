@@ -1,5 +1,4 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
-from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
@@ -10,7 +9,6 @@ from app.api.schemas import (
     TaskResponse,
 )
 from app.db.session import get_session
-from app.models.task import Task
 from app.services.claiming import claim_next_task
 from app.services.completion import complete_step
 from app.services.tasks import (
@@ -19,6 +17,7 @@ from app.services.tasks import (
     create_task,
     get_task,
     list_tasks,
+    reset_demo_task,
     start_task,
     task_parameters,
     task_response,
@@ -93,31 +92,6 @@ def complete_step_endpoint(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
-@router.post("/demo/seed", response_model=TaskResponse)
-def seed_demo_endpoint(session: Session = Depends(get_session)) -> TaskResponse | JSONResponse:
-    from sqlalchemy import select
-
-    from app.api.schemas import StepCreate
-
-    existing = session.scalar(select(Task).where(Task.name == "看板演示任务"))
-    if existing is not None:
-        return JSONResponse(
-            status_code=status.HTTP_200_OK,
-            content=task_response(get_task(session, existing.id)).model_dump(mode="json"),
-        )
-    session.rollback()
-    payload = TaskCreate(
-        group_name="演示客户组",
-        group_overrides={"channel": "email", "tone": ""},
-        name="看板演示任务",
-        base_parameters={"tone": "formal", "retry": 1},
-        steps=[
-            StepCreate(name="准备消息", overrides={"tone": "friendly"}),
-            StepCreate(name="发送消息", overrides={"tone": "", "retry": 3}),
-            StepCreate(name="安排跟进", overrides={"channel": "sms"}),
-        ],
-    )
-    return JSONResponse(
-        status_code=status.HTTP_201_CREATED,
-        content=task_response(create_task(session, payload)).model_dump(mode="json"),
-    )
+@router.post("/demo/seed", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+def seed_demo_endpoint(session: Session = Depends(get_session)) -> TaskResponse:
+    return task_response(reset_demo_task(session))

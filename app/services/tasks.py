@@ -9,6 +9,9 @@ from app.domain.enums import TaskStatus
 from app.domain.parameters import resolve_step_parameters
 from app.models.task import Task, TaskGroup, TaskStep
 
+DEMO_GROUP_NAME = "演示客户组"
+DEMO_TASK_NAME = "看板演示任务"
+
 
 class TaskConflictError(Exception):
     """Raised when a task operation conflicts with persisted state."""
@@ -19,10 +22,20 @@ class TaskNotFoundError(Exception):
 
 
 def create_task(session: Session, payload: TaskCreate) -> Task:
-    group = TaskGroup(
-        name=payload.group_name,
-        parameter_overrides=payload.group_overrides,
-    )
+    group = TaskGroup(name=payload.group_name, parameter_overrides=payload.group_overrides)
+    task = _build_task(payload, group)
+
+    try:
+        with session.begin():
+            session.add(task)
+            session.flush()
+    except IntegrityError as exc:
+        raise TaskConflictError("任务组名称已经存在") from exc
+
+    return task
+
+
+def _build_task(payload: TaskCreate, group: TaskGroup) -> Task:
     task = Task(
         name=payload.name,
         group=group,
@@ -36,14 +49,54 @@ def create_task(session: Session, payload: TaskCreate) -> Task:
         )
         for index, step in enumerate(payload.steps)
     ]
+    return task
 
-    try:
-        with session.begin():
-            session.add(task)
+
+def reset_demo_task(session: Session) -> Task:
+    from app.api.schemas import StepCreate
+
+    payload = TaskCreate(
+        group_name=DEMO_GROUP_NAME,
+        group_overrides={"channel": "email", "tone": ""},
+        name=DEMO_TASK_NAME,
+        base_parameters={"tone": "formal", "retry": 1},
+        steps=[
+            StepCreate(name="准备消息", overrides={"tone": "friendly"}),
+            StepCreate(name="发送消息", overrides={"tone": "", "retry": 3}),
+            StepCreate(name="安排跟进", overrides={"channel": "sms"}),
+        ],
+    )
+
+    with session.begin():
+        old_tasks = session.scalars(
+            select(Task)
+            .join(TaskGroup, Task.group_id == TaskGroup.id)
+            .where(
+                Task.name == DEMO_TASK_NAME,
+                TaskGroup.name == DEMO_GROUP_NAME,
+            )
+            .with_for_update()
+        ).all()
+        for old_task in old_tasks:
+            session.delete(old_task)
+        session.flush()
+
+        group = session.scalar(
+            select(TaskGroup).where(TaskGroup.name == DEMO_GROUP_NAME).with_for_update()
+        )
+        if group is None:
+            group = TaskGroup(
+                name=payload.group_name,
+                parameter_overrides=payload.group_overrides,
+            )
+            session.add(group)
             session.flush()
-    except IntegrityError as exc:
-        raise TaskConflictError("任务组名称已经存在") from exc
+        else:
+            group.parameter_overrides = payload.group_overrides
 
+        task = _build_task(payload, group)
+        session.add(task)
+        session.flush()
     return task
 
 
