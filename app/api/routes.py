@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.schemas import ParameterResponse, TaskCreate, TaskResponse
+from app.api.schemas import ClaimRequest, ParameterResponse, TaskCreate, TaskResponse
 from app.db.session import get_session
 from app.models.task import Task
+from app.services.claiming import claim_next_task
 from app.services.tasks import (
     TaskConflictError,
     TaskNotFoundError,
@@ -30,6 +31,16 @@ def create_task_endpoint(
 @router.get("/tasks", response_model=list[TaskResponse])
 def list_tasks_endpoint(session: Session = Depends(get_session)) -> list[TaskResponse]:
     return [task_response(task) for task in list_tasks(session)]
+
+
+@router.post("/tasks/claim", response_model=TaskResponse)
+def claim_task_endpoint(
+    payload: ClaimRequest, session: Session = Depends(get_session)
+) -> TaskResponse | Response:
+    task = claim_next_task(session, payload.worker_id)
+    if task is None:
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return task_response(get_task(session, task.id))
 
 
 @router.get("/tasks/{task_id}/parameters", response_model=ParameterResponse)
