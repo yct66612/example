@@ -1,76 +1,86 @@
-# Task Scheduler Dashboard Design
+# 任务调度看板设计方案
 
-## Goal
+## 目标
 
-Build a small FastAPI and MySQL task scheduler that demonstrates sticky parameter resolution, exclusive multi-worker task claiming, idempotent step completion logs, and a minimal live status dashboard.
+构建一个基于 FastAPI 和 MySQL 的小型任务调度系统，完整展示三级粘性参数解析、多进程唯一认领、步骤完成日志幂等写入，以及可实时刷新的极简状态看板。
 
-## Scope
+## 范围
 
-The delivery includes task groups, tasks, ordered steps, sticky parameter resolution, exclusive claims, state transitions, idempotent step completion, a polling dashboard, a five-request completion demo, and repeatable unit/integration evidence. It excludes authentication, external queues, distributed locks, worker leases, abandoned-claim recovery, deployment infrastructure, and production observability; these limitations will be documented.
+交付内容包括任务组、任务、有序步骤、粘性参数解析、唯一认领、状态流转、幂等步骤完成、轮询看板、五次并发完成演示，以及可重复运行的单元测试和集成测试证据。
 
-## Technology and Boundaries
+本次不实现身份认证、外部消息队列、分布式锁、worker 租约、失联任务自动回收、部署基础设施和生产级可观测性。这些不属于题目硬性要求，将在 README 中作为明确边界说明。
 
-- Python 3.11, FastAPI, Uvicorn, SQLAlchemy 2.x, Alembic, PyMySQL, pytest.
-- MySQL 8 with InnoDB.
-- Vanilla HTML/CSS/JavaScript served by FastAPI.
-- Routine persistence uses SQLAlchemy ORM.
-- Locking reads use SQLAlchemy `with_for_update(skip_locked=True)`.
-- MySQL upserts use the SQLAlchemy MySQL dialect, not hand-built SQL strings.
-- The API owns request-scoped sessions; service functions own explicit transaction blocks.
+## 技术与边界
 
-## Data Model
+- Python 3.11、FastAPI、Uvicorn、SQLAlchemy 2.x、Alembic、PyMySQL、pytest。
+- 数据库使用 MySQL 8 和 InnoDB。
+- 前端使用 FastAPI 托管的原生 HTML、CSS 和 JavaScript。
+- 常规持久化操作使用 SQLAlchemy ORM。
+- 锁定读取使用 SQLAlchemy 的 `with_for_update(skip_locked=True)`。
+- MySQL Upsert 使用 SQLAlchemy MySQL 方言 API，不手工拼接 SQL 字符串。
+- API 层管理请求级 Session，Service 层管理明确的事务边界。
 
-`task_groups` stores a unique name and JSON group overrides. `tasks` stores a group reference, name, status (`pending`, `claimed`, `running`, `done`, `failed`), base JSON parameters, current step index, worker identity, and claim timestamps. `task_steps` stores ordered steps and JSON overrides with unique `(task_id, step_index)`. `step_execution_logs` stores completion time and success with unique `(task_id, step_index)`.
+## 数据模型
 
-The claim query is supported by index `(status, created_at, id)`.
+`task_groups` 保存唯一组名和 JSON 格式的组级覆盖参数。`tasks` 保存所属组、任务名、状态（`pending`、`claimed`、`running`、`done`、`failed`）、基础参数、当前步骤序号、worker 标识和认领时间。`task_steps` 保存有序步骤和步骤覆盖参数，并设置唯一约束 `(task_id, step_index)`。`step_execution_logs` 保存完成时间和成功状态，并设置唯一约束 `(task_id, step_index)`。
 
-## Parameter Resolution
+任务认领查询使用组合索引 `(status, created_at, id)`。
 
-Start with a copy of task base parameters, apply group overrides literally, then process steps in order. A non-empty step override replaces or introduces a value and remains sticky for later steps. A step override value of `""` does nothing and preserves the currently effective value; if no value exists yet, the key stays absent. The resolver returns independent snapshots and never mutates stored JSON.
+## 参数解析
 
-Tests cover base values, group replacement, literal group empty strings, sticky step overrides, later replacement, empty-string fallback, new keys, and input immutability.
+先复制任务基础参数，再按字面值应用组级覆盖，最后按顺序处理每个步骤。步骤中的非空覆盖值会替换或新增当前值，并对后续步骤持续生效。步骤覆盖值为 `""` 时不进行覆盖，保留当时已经生效的值；如果该 key 从未出现，则继续保持不存在。
 
-## Claiming and State
+解析器为每个步骤返回互相独立的参数快照，不修改数据库模型中保存的 JSON 对象。
 
-Claiming is one transaction on one connection:
+测试覆盖基础值、组级覆盖、组级空字符串字面值、步骤粘性覆盖、后续再次覆盖、步骤空字符串回退、新增 key 和输入不可变性。
 
-1. Select the oldest pending task with `FOR UPDATE SKIP LOCKED`.
-2. Update it to `claimed`, recording worker ID and time.
-3. Commit before returning.
+## 任务认领与状态流转
 
-Allowed transitions are `pending -> claimed -> running -> done|failed`. Successful completion advances the current step and marks the final step done. A conditional update matching expected status and current step prevents duplicate reports from advancing twice.
+认领操作在同一个数据库连接的一次事务中完成：
 
-## Idempotent Completion
+1. 使用 `FOR UPDATE SKIP LOCKED` 查询最早的 pending 任务。
+2. 将任务改为 `claimed`，记录 worker ID 和认领时间。
+3. 提交事务后再返回认领结果。
 
-Completion uses the log unique constraint and a MySQL atomic upsert. Success is monotonic: a later failure cannot downgrade an existing success, while a later success may upgrade an earlier failure. Five concurrent success reports therefore leave one log row and one state transition.
+允许的状态流转为 `pending -> claimed -> running -> done|failed`。步骤成功后推进当前步骤，最后一个步骤成功后任务变为 `done`。任务推进使用包含预期状态和当前步骤序号的条件更新，避免重复上报导致推进多次。
 
-## API and Dashboard
+## 幂等完成上报
 
-- `POST /api/tasks`: create a group, task, and ordered steps.
-- `GET /api/tasks`: list task states and log summaries.
-- `POST /api/tasks/claim`: claim the next task for a worker ID.
-- `POST /api/tasks/{task_id}/start`: start a claimed task.
-- `POST /api/tasks/{task_id}/steps/{step_index}/complete`: report completion.
-- `GET /api/tasks/{task_id}/parameters`: show resolved snapshots.
-- `POST /api/demo/seed`: create deterministic sample data.
+完成上报依靠执行日志唯一约束和 MySQL 原子 Upsert。成功状态只允许单调增强：后到的失败不能把已有成功覆盖为失败，后到的成功可以把已有失败升级为成功。五次并发成功上报最终只保留一条日志，并且任务只推进一次。
 
-The root page is the operational dashboard. It polls task state once per second and provides seed, claim, start, parameter, and `Complete x5` controls.
+## API 与看板
 
-## Testing and Evidence
+- `POST /api/tasks`：一次性创建任务组、任务和有序步骤。
+- `GET /api/tasks`：查询任务状态和日志摘要。
+- `POST /api/tasks/claim`：为指定 worker 认领下一个任务。
+- `POST /api/tasks/{task_id}/start`：启动已认领任务。
+- `POST /api/tasks/{task_id}/steps/{step_index}/complete`：上报步骤完成。
+- `GET /api/tasks/{task_id}/parameters`：查看所有步骤的参数快照。
+- `POST /api/demo/seed`：创建确定性的演示数据。
 
-Unit tests run without MySQL. Integration tests use a dedicated database whose name ends in `_test`; they cover schema constraints, transitions, real multi-process claims, concurrent duplicate completion, monotonic success, rollback, and API responses. Each worker process creates its own engine and MySQL connection. The parent verifies every task was claimed exactly once and prints duplicate/missing counts.
+根页面直接展示操作看板，不制作宣传式首页。页面每秒轮询任务状态，提供创建演示数据、认领、启动、查看参数和 `并发完成 x5` 操作。
 
-## Configuration and Git
+## 测试与证据
 
-Database credentials come from `.env`; only `.env.example` is tracked. The supplied API-key file is ignored because this full-stack solution does not need it. Milestone commits will cover repository safety, schema, parameter resolution, claiming, idempotent logging, API/dashboard, and evidence documentation. `COLLAB.md` records substantive ownership and collaboration decisions for both teammates.
+单元测试不依赖 MySQL，主要验证纯参数规则。集成测试使用名称必须以 `_test` 结尾的专用数据库，覆盖表结构约束、状态流转、真实多进程认领、并发重复完成、成功状态不可降级、事务回滚和 API 响应。
 
-## Acceptance Criteria
+每个 worker 进程都创建自己的 SQLAlchemy Engine 和 MySQL 连接。父进程校验每个任务恰好被认领一次，并输出重复数和遗漏数。
 
-- A clean checkout starts from the README.
-- Unit and MySQL integration tests pass.
-- Parameter edge cases are demonstrated.
-- Multi-process evidence reports zero duplicate claims.
-- Five completion reports leave exactly one log row.
-- A successful log cannot be overwritten by a later failure.
-- The dashboard exposes all required task states and the five-report demo.
-- No secret file is tracked by Git.
+## 配置与 Git
+
+数据库凭证从 `.env` 读取，只提交 `.env.example`。题目提供的 API Key 文件已被忽略，因为全栈方向不需要它。
+
+Git 按可独立验证的里程碑提交：仓库安全、数据库结构、参数解析、任务认领、幂等日志、API 与看板、测试证据与文档。`COLLAB.md` 用于记录两名候选人的实质工作、分歧和解决方式。
+
+所有 Git 提交信息、设计文档、实施计划和项目说明统一使用中文；代码标识符、命令、路径和标准技术术语保留英文。
+
+## 验收标准
+
+- 全新检出后可以按照 README 启动。
+- 单元测试和 MySQL 集成测试全部通过。
+- 参数测试覆盖题目要求的边界情况。
+- 多进程测试输出重复认领数为 0。
+- 五次并发完成上报最终只有一条日志。
+- 已成功的日志不能被后到的失败上报覆盖。
+- 看板展示所有要求的任务状态和五次并发演示入口。
+- Git 中不存在任何真实凭证。
