@@ -98,6 +98,9 @@ def run_once(database_url: str, count: int, workers: int, run_number: int) -> tu
             .where(Task.name.like(f"{prefix}%"), Task.status == TaskStatus.CLAIMED)
         )
         session.execute(delete(Task).where(Task.name.like(f"{prefix}%")))
+        group = session.scalar(select(TaskGroup).where(TaskGroup.name == f"{prefix}group"))
+        if group is not None:
+            session.delete(group)
         session.commit()
     engine.dispose()
     if claimed_count != count:

@@ -46,10 +46,9 @@ def test_completion_log_is_idempotent_and_success_is_monotonic(db_session: Sessi
     task_id, worker_id = _seed_claimed_task(db_session, step_count=1)
     start_task(db_session, task_id, worker_id)
 
-    complete_step(db_session, task_id, 0, False, worker_id)
-    complete_step(db_session, task_id, 0, False, worker_id)
     complete_step(db_session, task_id, 0, True, worker_id)
     complete_step(db_session, task_id, 0, False, worker_id)
+    complete_step(db_session, task_id, 0, True, worker_id)
 
     log_count = db_session.scalar(
         select(func.count())
@@ -67,6 +66,25 @@ def test_completion_log_is_idempotent_and_success_is_monotonic(db_session: Sessi
     assert log_count == 1
     assert log is not None and log.success is True
     assert task is not None and task.status == TaskStatus.DONE
+
+
+def test_failure_then_success_upgrades_only_the_log(db_session: Session) -> None:
+    task_id, worker_id = _seed_claimed_task(db_session, step_count=1)
+    start_task(db_session, task_id, worker_id)
+
+    complete_step(db_session, task_id, 0, False, worker_id)
+    complete_step(db_session, task_id, 0, True, worker_id)
+
+    log = db_session.scalar(
+        select(StepExecutionLog).where(
+            StepExecutionLog.task_id == task_id,
+            StepExecutionLog.step_index == 0,
+        )
+    )
+    task = db_session.get(Task, task_id)
+
+    assert log is not None and log.success is True
+    assert task is not None and task.status == TaskStatus.FAILED
 
 
 def test_five_independent_connections_advance_one_step_once(

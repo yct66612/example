@@ -13,7 +13,7 @@
 
 ```text
 Ruff：通过
-Python 单元测试：6 passed
+Python 单元测试：7 passed
 Python 编译检查：通过
 JavaScript 语法检查：通过
 FastAPI 根页面访问：HTTP 200
@@ -22,7 +22,7 @@ FastAPI 根页面访问：HTTP 200
 完整 `pytest -v` 当前结果：
 
 ```text
-6 passed, 13 skipped
+7 passed, 14 skipped
 ```
 
 13 个跳过项是需要专用 MySQL 测试库的集成测试，原因是当前 `.env` 尚未配置 `TEST_DATABASE_URL`。
