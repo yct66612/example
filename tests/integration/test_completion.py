@@ -8,7 +8,7 @@ from app.domain.enums import TaskStatus
 from app.models.task import StepExecutionLog, Task, TaskGroup, TaskStep
 from app.services.claiming import claim_next_task
 from app.services.completion import complete_step
-from app.services.tasks import TaskConflictError, start_task
+from app.services.tasks import TaskConflictError, TaskNotFoundError, start_task
 
 pytestmark = pytest.mark.integration
 
@@ -40,6 +40,42 @@ def test_only_claiming_worker_can_start_task(db_session: Session) -> None:
     started = start_task(db_session, task_id, worker_id)
 
     assert started.status == TaskStatus.RUNNING
+
+
+def test_claimed_task_cannot_report_current_step_before_start(db_session: Session) -> None:
+    task_id, worker_id = _seed_claimed_task(db_session, step_count=1)
+
+    with pytest.raises(TaskConflictError):
+        complete_step(db_session, task_id, 0, True, worker_id)
+
+    log_count = db_session.scalar(
+        select(func.count())
+        .select_from(StepExecutionLog)
+        .where(StepExecutionLog.task_id == task_id)
+    )
+    task = db_session.get(Task, task_id)
+
+    assert log_count == 0
+    assert task is not None and task.status == TaskStatus.CLAIMED
+
+
+def test_completion_rejects_future_or_missing_step(db_session: Session) -> None:
+    task_id, worker_id = _seed_claimed_task(db_session, step_count=2)
+    start_task(db_session, task_id, worker_id)
+
+    with pytest.raises(TaskConflictError):
+        complete_step(db_session, task_id, 1, True, worker_id)
+
+    with pytest.raises(TaskNotFoundError):
+        complete_step(db_session, task_id, 99, True, worker_id)
+
+
+def test_starting_a_running_task_again_is_rejected(db_session: Session) -> None:
+    task_id, worker_id = _seed_claimed_task(db_session, step_count=1)
+    start_task(db_session, task_id, worker_id)
+
+    with pytest.raises(TaskConflictError):
+        start_task(db_session, task_id, worker_id)
 
 
 def test_completion_log_is_idempotent_and_success_is_monotonic(db_session: Session) -> None:

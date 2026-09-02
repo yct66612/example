@@ -43,6 +43,8 @@ def complete_step(
             raise TaskNotFoundError("步骤不存在")
         if step_index > task.current_step_index:
             raise TaskConflictError("不能提前上报尚未执行的步骤")
+        if task.status in {TaskStatus.PENDING, TaskStatus.CLAIMED}:
+            raise TaskConflictError("任务尚未启动，不能上报当前步骤")
 
         insert_statement = insert(StepExecutionLog).values(
             task_id=task_id,

@@ -54,3 +54,9 @@ def test_duplicate_group_name_returns_conflict(client: TestClient) -> None:
     response = client.post("/api/tasks", json=_task_payload())
 
     assert response.status_code == 409
+
+
+def test_claim_returns_no_content_when_no_pending_task_exists(client: TestClient) -> None:
+    response = client.post("/api/tasks/claim", json={"worker_id": "worker-a"})
+
+    assert response.status_code == 204
