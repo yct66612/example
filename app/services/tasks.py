@@ -114,4 +114,6 @@ def start_task(session: Session, task_id: int, worker_id: str) -> Task:
             raise TaskConflictError("只有认领任务的 worker 可以启动任务")
         task.status = TaskStatus.RUNNING
         session.flush()
-    return get_task(session, task_id)
+    started_task = get_task(session, task_id)
+    session.rollback()
+    return started_task

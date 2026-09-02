@@ -1,14 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
 
 
 def test_dashboard_page_and_assets_are_available(client: TestClient) -> None:

@@ -7,6 +7,8 @@ import os
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
+from app.config import get_settings
+from app.domain.enums import TaskStatus
 from app.models.task import StepExecutionLog, Task, TaskGroup, TaskStep
 from app.services.claiming import claim_next_task
 from app.services.completion import complete_step
@@ -14,9 +16,10 @@ from app.services.tasks import start_task
 
 
 def _require_test_url() -> str:
-    url = os.getenv("TEST_DATABASE_URL")
-    if not url:
-        raise SystemExit("请先设置 TEST_DATABASE_URL")
+    try:
+        url = get_settings().test_database_url
+    except Exception as exc:
+        raise SystemExit(f"请先配置 TEST_DATABASE_URL：{exc}") from exc
     database_name = url.rsplit("/", maxsplit=1)[-1].split("?", maxsplit=1)[0]
     if not database_name.endswith("_test"):
         raise SystemExit("为避免误删数据，TEST_DATABASE_URL 的数据库名必须以 _test 结尾")
@@ -65,7 +68,12 @@ def main() -> None:
         print(f"完成上报次数：{args.reports}")
         print(f"最终日志行数：{log_count}")
         print(f"最终任务状态：{task.status if task else 'missing'}")
-        if log_count != 1 or task is None or task.current_step_index != 1:
+        if (
+            log_count != 1
+            or task is None
+            or task.current_step_index != 1
+            or task.status != TaskStatus.DONE
+        ):
             raise SystemExit(1)
         session.delete(task)
         session.commit()

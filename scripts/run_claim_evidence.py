@@ -8,15 +8,17 @@ from queue import Empty
 from sqlalchemy import create_engine, delete, func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.config import get_settings
 from app.domain.enums import TaskStatus
 from app.models.task import Task, TaskGroup, TaskStep
 from app.services.claiming import claim_next_task
 
 
 def _require_test_url() -> str:
-    url = os.getenv("TEST_DATABASE_URL")
-    if not url:
-        raise SystemExit("请先设置 TEST_DATABASE_URL")
+    try:
+        url = get_settings().test_database_url
+    except Exception as exc:
+        raise SystemExit(f"请先配置 TEST_DATABASE_URL：{exc}") from exc
     database_name = url.rsplit("/", maxsplit=1)[-1].split("?", maxsplit=1)[0]
     if not database_name.endswith("_test"):
         raise SystemExit("为避免误删数据，TEST_DATABASE_URL 的数据库名必须以 _test 结尾")
@@ -24,28 +26,27 @@ def _require_test_url() -> str:
 
 
 def _worker(database_url: str, worker_id: str, result_queue) -> None:
-    engine = create_engine(database_url, pool_pre_ping=True)
+    engine = create_engine(
+        database_url, pool_pre_ping=True, isolation_level="READ COMMITTED"
+    )
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     try:
         with factory() as session:
+            claimed_ids: list[int] = []
             while True:
                 task = claim_next_task(session, worker_id)
                 if task is None:
-                    return
-                result_queue.put(task.id)
+                    break
+                claimed_ids.append(task.id)
+            result_queue.put(claimed_ids)
     finally:
         engine.dispose()
 
 
 def _prepare_tasks(session: Session, count: int, prefix: str) -> set[int]:
-    old_tasks = session.scalars(select(Task).where(Task.name.like(f"{prefix}%"))).all()
-    for old_task in old_tasks:
-        session.delete(old_task)
+    for model in (Task, TaskGroup):
+        session.execute(delete(model))
     session.flush()
-    old_group = session.scalar(select(TaskGroup).where(TaskGroup.name == f"{prefix}group"))
-    if old_group is not None:
-        session.delete(old_group)
-        session.flush()
 
     group = TaskGroup(name=f"{prefix}group", parameter_overrides={})
     tasks = [
@@ -84,9 +85,9 @@ def run_once(database_url: str, count: int, workers: int, run_number: int) -> tu
         raise RuntimeError(f"worker 进程异常退出：{exit_codes}")
 
     claimed_ids: list[int] = []
-    while len(claimed_ids) < count:
+    for _ in processes:
         try:
-            claimed_ids.append(result_queue.get(timeout=5))
+            claimed_ids.extend(result_queue.get(timeout=10))
         except Empty:
             break
     duplicate_count = len(claimed_ids) - len(set(claimed_ids))
@@ -104,7 +105,7 @@ def run_once(database_url: str, count: int, workers: int, run_number: int) -> tu
         session.commit()
     engine.dispose()
     if claimed_count != count:
-        missing_count += count - (claimed_count or 0)
+        missing_count = max(missing_count, count - (claimed_count or 0))
     return len(claimed_ids), duplicate_count, missing_count
 
 

@@ -1,6 +1,6 @@
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
 from app.domain.enums import TaskStatus
 
@@ -19,12 +19,10 @@ class TaskCreate(BaseModel):
 
 
 class TaskStepResponse(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     step_index: int
     name: str
-    overrides: dict[str, Any] = Field(validation_alias="parameter_overrides")
+    overrides: dict[str, Any]
 
 
 class TaskResponse(BaseModel):

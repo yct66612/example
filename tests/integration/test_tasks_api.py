@@ -1,14 +1,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-
 pytestmark = pytest.mark.integration
-
-
-@pytest.fixture
-def client() -> TestClient:
-    return TestClient(app)
 
 
 def _task_payload(group_name: str = "sales") -> dict:

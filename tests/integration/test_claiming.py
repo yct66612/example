@@ -1,11 +1,11 @@
 import multiprocessing
-import os
 from queue import Empty
 
 import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.config import get_settings
 from app.domain.enums import TaskStatus
 from app.models.task import Task, TaskGroup, TaskStep
 from app.services.claiming import claim_next_task
@@ -30,15 +30,19 @@ def _seed_tasks(session: Session, count: int) -> list[int]:
 
 
 def _claim_worker(database_url: str, worker_id: str, result_queue) -> None:
-    engine = create_engine(database_url, pool_pre_ping=True)
+    engine = create_engine(
+        database_url, pool_pre_ping=True, isolation_level="READ COMMITTED"
+    )
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     try:
         with factory() as session:
+            claimed_ids: list[int] = []
             while True:
                 task = claim_next_task(session, worker_id)
                 if task is None:
                     break
-                result_queue.put(task.id)
+                claimed_ids.append(task.id)
+            result_queue.put(claimed_ids)
     finally:
         engine.dispose()
 
@@ -62,7 +66,7 @@ def test_claims_oldest_pending_task_once(db_session: Session) -> None:
 
 def test_ten_real_processes_claim_each_task_exactly_once(db_session: Session) -> None:
     task_ids = set(_seed_tasks(db_session, 100))
-    database_url = os.environ["TEST_DATABASE_URL"]
+    database_url = get_settings().test_database_url
     context = multiprocessing.get_context("spawn")
     result_queue = context.Queue()
     processes = [
@@ -77,9 +81,9 @@ def test_ten_real_processes_claim_each_task_exactly_once(db_session: Session) ->
         assert process.exitcode == 0
 
     claimed_ids: list[int] = []
-    while len(claimed_ids) < 100:
+    for _ in processes:
         try:
-            claimed_ids.append(result_queue.get(timeout=5))
+            claimed_ids.extend(result_queue.get(timeout=10))
         except Empty:
             break
 

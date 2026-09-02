@@ -8,7 +8,11 @@ from app.config import get_settings
 
 
 def build_engine(url: str) -> Engine:
-    return create_engine(url, pool_pre_ping=True)
+    return create_engine(
+        url,
+        pool_pre_ping=True,
+        isolation_level="READ COMMITTED",
+    )
 
 
 def build_session_factory(engine: Engine) -> sessionmaker[Session]:
