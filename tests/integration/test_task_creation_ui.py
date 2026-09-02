@@ -30,3 +30,4 @@ def test_task_creation_script_contains_validation_and_create_flow(client: TestCl
     assert "add-step-button" in script.text
     assert "task-dialog" in script.text
     assert "reset-demo-button" in script.text
+    assert "请新建任务或重置演示任务" in script.text

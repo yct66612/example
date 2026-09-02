@@ -37,7 +37,7 @@ function actionButtons(task) {
 function renderTasks() {
   const body = $("#task-table-body");
   if (!state.tasks.length) {
-    body.innerHTML = '<tr><td colspan="6" class="empty-state">暂无任务，请创建演示任务。</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" class="empty-state">暂无任务，请新建任务或重置演示任务。</td></tr>';
     return;
   }
   body.innerHTML = state.tasks.map((task) => {
