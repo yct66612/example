@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>任务调度看板</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="page-shell">
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">kGroup 全栈笔试</p>
+        <h1>任务调度看板</h1>
+        <p class="subtitle">观察任务认领、步骤流转与幂等完成上报。</p>
+      </div>
+      <div class="header-actions">
+        <label for="worker-id">Worker ID</label>
+        <input id="worker-id" value="dashboard-worker" maxlength="100">
+        <button id="refresh-button" type="button">刷新</button>
+        <button id="seed-button" type="button">创建演示任务</button>
+        <button id="claim-button" type="button" class="primary">认领下一个任务</button>
+      </div>
+    </header>
+
+    <section id="status-summary" class="summary-grid" aria-label="任务状态统计"></section>
+
+    <section class="content-grid">
+      <div class="panel task-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>任务列表</h2>
+            <p id="last-updated">等待加载</p>
+          </div>
+          <span id="operation-result" class="result" role="status"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>任务</th>
+                <th>状态</th>
+                <th>当前步骤</th>
+                <th>Worker</th>
+                <th>日志</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="task-table-body"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <aside class="panel detail-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>参数快照</h2>
+            <p id="selected-task">选择任务查看每步生效参数</p>
+          </div>
+        </div>
+        <div id="parameter-detail" class="parameter-detail empty-state">暂无数据</div>
+      </aside>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>
