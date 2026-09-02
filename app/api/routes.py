@@ -1,16 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
-from app.api.schemas import ClaimRequest, ParameterResponse, TaskCreate, TaskResponse
+from app.api.schemas import (
+    ClaimRequest,
+    ParameterResponse,
+    StepCompleteRequest,
+    TaskCreate,
+    TaskResponse,
+)
 from app.db.session import get_session
 from app.models.task import Task
 from app.services.claiming import claim_next_task
+from app.services.completion import complete_step
 from app.services.tasks import (
     TaskConflictError,
     TaskNotFoundError,
     create_task,
     get_task,
     list_tasks,
+    start_task,
     task_parameters,
     task_response,
 )
@@ -60,10 +68,24 @@ def start_task_endpoint(
     worker_id: str,
     session: Session = Depends(get_session),
 ) -> TaskResponse:
-    from app.services.tasks import start_task
-
     try:
         return task_response(start_task(session, task_id, worker_id))
+    except TaskNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except TaskConflictError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+@router.post("/tasks/{task_id}/steps/{step_index}/complete", response_model=TaskResponse)
+def complete_step_endpoint(
+    task_id: int,
+    step_index: int,
+    payload: StepCompleteRequest,
+    session: Session = Depends(get_session),
+) -> TaskResponse:
+    try:
+        complete_step(session, task_id, step_index, payload.success, payload.worker_id)
+        return task_response(get_task(session, task_id))
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except TaskConflictError as exc:

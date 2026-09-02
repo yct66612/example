@@ -49,3 +49,8 @@ class ClaimRequest(BaseModel):
 class ParameterResponse(BaseModel):
     task_id: int
     snapshots: list[dict[str, Any]]
+
+
+class StepCompleteRequest(BaseModel):
+    worker_id: str = Field(min_length=1, max_length=100)
+    success: bool
