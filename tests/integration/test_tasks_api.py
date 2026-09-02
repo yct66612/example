@@ -32,7 +32,30 @@ def test_create_list_and_resolve_task(client: TestClient) -> None:
 
     parameters = client.get(f"/api/tasks/{created['id']}/parameters")
     assert parameters.status_code == 200
-    assert parameters.json()["snapshots"] == [
+    details = parameters.json()
+    assert details["base_parameters"] == {"tone": "formal", "retry": 1}
+    assert details["group_overrides"] == {"channel": "email", "tone": ""}
+    assert details["steps"] == [
+        {
+            "step_index": 0,
+            "name": "prepare",
+            "override": {"tone": "friendly"},
+            "effective": {"tone": "friendly", "retry": 1, "channel": "email"},
+        },
+        {
+            "step_index": 1,
+            "name": "send",
+            "override": {"tone": "", "retry": 3},
+            "effective": {"tone": "friendly", "retry": 3, "channel": "email"},
+        },
+        {
+            "step_index": 2,
+            "name": "follow-up",
+            "override": {"channel": "sms"},
+            "effective": {"tone": "friendly", "retry": 3, "channel": "sms"},
+        },
+    ]
+    assert details["snapshots"] == [
         {"tone": "friendly", "retry": 1, "channel": "email"},
         {"tone": "friendly", "retry": 3, "channel": "email"},
         {"tone": "friendly", "retry": 3, "channel": "sms"},

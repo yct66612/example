@@ -4,7 +4,13 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.api.schemas import TaskCreate, TaskResponse, TaskStepResponse
+from app.api.schemas import (
+    ParameterResponse,
+    ParameterStepResponse,
+    TaskCreate,
+    TaskResponse,
+    TaskStepResponse,
+)
 from app.domain.enums import TaskStatus
 from app.domain.parameters import resolve_step_parameters
 from app.models.task import Task, TaskGroup, TaskStep
@@ -155,6 +161,25 @@ def task_parameters(task: Task) -> list[dict]:
         task.base_parameters,
         task.group.parameter_overrides,
         [step.parameter_overrides for step in task.steps],
+    )
+
+
+def task_parameter_details(task: Task) -> ParameterResponse:
+    snapshots = task_parameters(task)
+    return ParameterResponse(
+        task_id=task.id,
+        base_parameters=dict(task.base_parameters),
+        group_overrides=dict(task.group.parameter_overrides),
+        steps=[
+            ParameterStepResponse(
+                step_index=step.step_index,
+                name=step.name,
+                override=dict(step.parameter_overrides),
+                effective=dict(snapshots[index]),
+            )
+            for index, step in enumerate(task.steps)
+        ],
+        snapshots=snapshots,
     )
 
 

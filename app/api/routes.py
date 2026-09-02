@@ -19,7 +19,7 @@ from app.services.tasks import (
     list_tasks,
     reset_demo_task,
     start_task,
-    task_parameters,
+    task_parameter_details,
     task_response,
 )
 
@@ -59,7 +59,7 @@ def task_parameters_endpoint(
         task = get_task(session, task_id)
     except TaskNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
-    return ParameterResponse(task_id=task.id, snapshots=task_parameters(task))
+    return task_parameter_details(task)
 
 
 @router.post("/tasks/{task_id}/start", response_model=TaskResponse)

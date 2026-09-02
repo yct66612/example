@@ -46,7 +46,17 @@ class ClaimRequest(BaseModel):
 
 class ParameterResponse(BaseModel):
     task_id: int
+    base_parameters: dict[str, Any]
+    group_overrides: dict[str, Any]
+    steps: list["ParameterStepResponse"]
     snapshots: list[dict[str, Any]]
+
+
+class ParameterStepResponse(BaseModel):
+    step_index: int
+    name: str
+    override: dict[str, Any]
+    effective: dict[str, Any]
 
 
 class StepCompleteRequest(BaseModel):
