@@ -1,5 +1,6 @@
 import multiprocessing
 import os
+from queue import Empty
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -76,8 +77,11 @@ def test_ten_real_processes_claim_each_task_exactly_once(db_session: Session) ->
         assert process.exitcode == 0
 
     claimed_ids: list[int] = []
-    while not result_queue.empty():
-        claimed_ids.append(result_queue.get())
+    while len(claimed_ids) < 100:
+        try:
+            claimed_ids.append(result_queue.get(timeout=5))
+        except Empty:
+            break
 
     assert len(claimed_ids) == 100
     assert len(set(claimed_ids)) == 100
