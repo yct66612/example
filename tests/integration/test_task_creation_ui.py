@@ -31,3 +31,17 @@ def test_task_creation_script_contains_validation_and_create_flow(client: TestCl
     assert "task-dialog" in script.text
     assert "reset-demo-button" in script.text
     assert "请新建任务或重置演示任务" in script.text
+    assert "parameter-matrix" in script.text
+    assert "L1 基础" in script.text
+    assert "L2 组级" in script.text
+    assert "L3" in script.text
+    assert "生效值" in script.text
+    assert "空字符串，沿用当前值" in script.text
+
+
+def test_parameter_matrix_uses_full_width_layout(client: TestClient) -> None:
+    styles = client.get("/static/styles.css")
+
+    assert styles.status_code == 200
+    assert ".task-panel, .detail-panel" in styles.text
+    assert "grid-column: 1 / -1" in styles.text

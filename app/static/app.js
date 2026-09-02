@@ -53,14 +53,63 @@ function renderTasks() {
   }).join("");
 }
 
-function renderParameters(taskId, snapshots) {
+function formatParameterValue(value, type = "value") {
+  if (value === undefined) return '<span class="param-empty">未设置</span>';
+  if (type === "override" && value === "") {
+    return '<span class="param-inherit">空字符串，沿用当前值</span>';
+  }
+  if (typeof value === "string") {
+    return `<span class="param-value">${escapeHtml(value || "空字符串")}</span>`;
+  }
+  return `<span class="param-value">${escapeHtml(JSON.stringify(value))}</span>`;
+}
+
+function collectParameterKeys(details) {
+  const keys = [];
+  const addKeys = (values) => {
+    Object.keys(values || {}).forEach((key) => {
+      if (!keys.includes(key)) keys.push(key);
+    });
+  };
+  addKeys(details.base_parameters);
+  addKeys(details.group_overrides);
+  details.steps.forEach((step) => {
+    addKeys(step.override);
+    addKeys(step.effective);
+  });
+  return keys;
+}
+
+function renderParameters(taskId, details) {
   state.selectedTaskId = taskId;
   const task = state.tasks.find((item) => item.id === taskId);
   $("#selected-task").textContent = task ? `任务 #${task.id} · ${task.name}` : `任务 #${taskId}`;
   $("#parameter-detail").classList.remove("empty-state");
-  $("#parameter-detail").innerHTML = `<div class="parameter-list">${snapshots.map((snapshot, index) => `
-    <div class="parameter-step"><strong>步骤 ${index + 1}</strong><pre>${escapeHtml(JSON.stringify(snapshot, null, 2))}</pre></div>
-  `).join("")}</div>`;
+  const keys = collectParameterKeys(details);
+  const stepHeaders = details.steps.map((step) => `
+    <th>${escapeHtml(`步骤 ${step.step_index + 1} L3`)}</th>
+    <th>${escapeHtml(`步骤 ${step.step_index + 1} 生效值`)}</th>
+  `).join("");
+  const rows = keys.map((key) => {
+    const stepCells = details.steps.map((step) => `
+      <td class="parameter-cell override">${formatParameterValue(step.override[key], "override")}</td>
+      <td class="parameter-cell effective">${formatParameterValue(step.effective[key])}</td>
+    `).join("");
+    return `<tr>
+      <td class="parameter-name">${escapeHtml(key)}</td>
+      <td class="parameter-cell">${formatParameterValue(details.base_parameters[key])}</td>
+      <td class="parameter-cell override">${formatParameterValue(details.group_overrides[key])}</td>
+      ${stepCells}
+    </tr>`;
+  }).join("");
+  $("#parameter-detail").innerHTML = `
+    <p class="parameter-legend"><span>覆盖值</span><span class="param-inherit">空字符串，沿用当前值</span><span>未设置表示该层没有声明</span></p>
+    <div class="parameter-matrix-wrap">
+      <table class="parameter-matrix">
+        <thead><tr><th>参数</th><th>L1 基础</th><th>L2 组级覆盖</th>${stepHeaders}</tr></thead>
+        <tbody>${rows || '<tr><td colspan="3" class="empty-state">没有参数</td></tr>'}</tbody>
+      </table>
+    </div>`;
 }
 
 function escapeHtml(value) {
@@ -185,7 +234,7 @@ async function runAction(action, taskId) {
   try {
     if (action === "parameters") {
       const data = await request(`/api/tasks/${taskId}/parameters`);
-      renderParameters(taskId, data.snapshots);
+      renderParameters(taskId, data);
       return;
     }
     if (action === "start") {

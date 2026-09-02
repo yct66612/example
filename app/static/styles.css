@@ -42,6 +42,7 @@ h2 { margin-bottom: 4px; font-size: 18px; }
 .summary-item.failed { border-left-color: var(--red); }
 
 .content-grid { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: 16px; align-items: start; }
+.task-panel, .detail-panel { grid-column: 1 / -1; }
 .panel { background: #fff; border: 1px solid var(--border); border-radius: 6px; }
 .panel-heading { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 17px 18px; border-bottom: 1px solid var(--border); }
 .panel-heading p { margin-bottom: 0; font-size: 12px; }
@@ -61,10 +62,21 @@ tbody tr:last-child td { border-bottom: 0; }
 .row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .row-actions button { padding: 6px 8px; font-size: 12px; }
 .parameter-detail { padding: 16px 18px; }
-.parameter-list { display: grid; gap: 12px; }
-.parameter-step { border-top: 1px solid var(--border); padding-top: 11px; }
-.parameter-step:first-child { border-top: 0; padding-top: 0; }
-.parameter-step strong { display: block; margin-bottom: 6px; }
+.parameter-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 0 0 12px; color: var(--muted); font-size: 12px; }
+.parameter-matrix-wrap { overflow-x: auto; border: 1px solid var(--border); }
+.parameter-matrix { width: 100%; min-width: 760px; border-collapse: collapse; font-size: 12px; }
+.parameter-matrix th, .parameter-matrix td { padding: 10px 9px; border-bottom: 1px solid #edf0f2; border-right: 1px solid #edf0f2; text-align: left; vertical-align: top; }
+.parameter-matrix th:last-child, .parameter-matrix td:last-child { border-right: 0; }
+.parameter-matrix tr:last-child td { border-bottom: 0; }
+.parameter-matrix th { background: #f7f9fa; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.parameter-matrix .parameter-name { position: sticky; left: 0; min-width: 100px; background: #fff; color: #17212b; font-weight: 700; }
+.parameter-matrix th:first-child { position: sticky; left: 0; z-index: 1; }
+.parameter-cell { min-width: 92px; line-height: 1.4; word-break: break-word; }
+.parameter-cell.effective { color: var(--blue); font-weight: 650; }
+.parameter-cell.override { color: #8a5700; }
+.param-empty { color: #8a959f; }
+.param-inherit { color: var(--green); }
+.param-value { color: inherit; }
 pre { margin: 0; overflow-x: auto; background: #f7f9fa; padding: 10px; font-size: 12px; }
 .result { max-width: 220px; color: var(--green); font-size: 12px; }
 .result.error { color: var(--red); }
