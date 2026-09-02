@@ -34,7 +34,6 @@
 - `scripts/run_claim_evidence.py`：多进程认领证据脚本。
 - `scripts/run_completion_evidence.py`：重复完成上报证据脚本。
 - `README.md`：一页以内的提交说明。
-- `COLLAB.md`：两名候选人的协作记录。
 
 ## 任务一：项目基础与配置
 
@@ -425,11 +424,10 @@ git add app/static app/main.py app/api/routes.py tests/integration/test_dashboar
 git commit -m "界面：完成任务状态看板与五次并发演示"
 ```
 
-## 任务八：交付文档、协作记录与最终验证
+## 任务八：交付文档与最终验证
 
 **文件：**
 - 新建：`README.md`
-- 新建：`COLLAB.md`
 - 新建：`docs/test-evidence.md`
 - 修改：`.gitignore`
 
@@ -437,11 +435,7 @@ git commit -m "界面：完成任务状态看板与五次并发演示"
 
 说明前置条件、MySQL 初始化、`.env`、迁移、启动、测试、架构、选择 Python/MySQL 的理由、多进程测试为何是真并发、参数边界、InnoDB 锁机制、明确删减项和实际耗时。原始证据放入 `docs/test-evidence.md`，避免 README 过长。
 
-- [ ] **步骤 2：编写中文协作记录**
-
-记录两名候选人的姓名、实质职责、分歧、解决方式和各自完成的验证。交付前第二名成员必须产生真实代码或测试提交，不能使用空提交或纯格式提交代替。
-
-- [ ] **步骤 3：采集最新验证证据**
+- [ ] **步骤 2：采集最新验证证据**
 
 ```powershell
 .\.venv\Scripts\ruff check app tests scripts
@@ -452,7 +446,7 @@ git commit -m "界面：完成任务状态看板与五次并发演示"
 
 预期：Ruff 无错误、所有测试通过、重复/遗漏认领均为 0、完成日志数量为 1。
 
-- [ ] **步骤 4：审计 Git 安全和变更内容**
+- [ ] **步骤 3：审计 Git 安全和变更内容**
 
 ```powershell
 git diff --check
@@ -463,14 +457,14 @@ git grep -n -I -E "api[_-]?key|password|secret" -- . ':!*.example' ':!kGroup实�
 
 预期：没有空白错误；API Key 和 `.env` 均被忽略；已跟踪文件中不存在真实凭证。
 
-- [ ] **步骤 5：提交最终文档**
+- [ ] **步骤 4：提交最终文档**
 
 ```powershell
-git add README.md COLLAB.md docs/test-evidence.md .gitignore
-git commit -m "文档：补充运行说明协作记录与测试证据"
+git add README.md docs/test-evidence.md .gitignore
+git commit -m "文档：补充运行说明与测试证据"
 ```
 
-- [ ] **步骤 6：检查中文提交历史**
+- [ ] **步骤 5：检查中文提交历史**
 
 运行：`git log --oneline --decorate --reverse`
 
