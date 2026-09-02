@@ -1,7 +1,7 @@
 const state = { tasks: [], selectedTaskId: null };
 const statuses = ["pending", "claimed", "running", "done", "failed"];
-
 const $ = (selector) => document.querySelector(selector);
+const taskDialog = $("#task-dialog");
 const workerId = () => $("#worker-id").value.trim() || "dashboard-worker";
 
 function showResult(message, error = false) {
@@ -67,6 +67,102 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[character]));
 }
 
+function setTaskFormError(message = "") {
+  $("#task-form-error").textContent = message;
+}
+
+function createStepEditor(index, name = `步骤 ${index + 1}`, overrides = "{}") {
+  const editor = document.createElement("div");
+  editor.className = "step-editor";
+  editor.innerHTML = `
+    <div class="step-editor-header">
+      <span class="step-number">步骤 ${index + 1}</span>
+      <button class="remove-step-button" type="button">删除步骤</button>
+    </div>
+    <div class="step-fields">
+      <label>步骤名称<input class="step-name" maxlength="150" value="${escapeHtml(name)}" required></label>
+      <label>L3 步骤覆盖 JSON<textarea class="step-overrides" rows="3" spellcheck="false">${escapeHtml(overrides)}</textarea></label>
+    </div>
+  `;
+  editor.querySelector(".remove-step-button").addEventListener("click", () => {
+    const editors = document.querySelectorAll(".step-editor");
+    if (editors.length <= 1) {
+      setTaskFormError("至少需要保留一个步骤");
+      return;
+    }
+    editor.remove();
+    renumberStepEditors();
+    setTaskFormError();
+  });
+  return editor;
+}
+
+function renumberStepEditors() {
+  document.querySelectorAll(".step-editor").forEach((editor, index) => {
+    editor.querySelector(".step-number").textContent = `步骤 ${index + 1}`;
+  });
+}
+
+function resetTaskForm() {
+  $("#group-name").value = "新客户组";
+  $("#task-name").value = "新任务";
+  $("#base-parameters").value = "{}";
+  $("#group-overrides").value = "{}";
+  $("#steps-container").replaceChildren(
+    createStepEditor(0, "准备步骤", "{}"),
+    createStepEditor(1, "执行步骤", "{}"),
+  );
+  setTaskFormError();
+}
+
+function openTaskDialog() {
+  resetTaskForm();
+  taskDialog.showModal();
+  $("#group-name").focus();
+}
+
+function closeTaskDialog() {
+  taskDialog.close();
+  setTaskFormError();
+}
+
+function parseObjectJson(value, label) {
+  const source = value.trim() || "{}";
+  let parsed;
+  try {
+    parsed = JSON.parse(source);
+  } catch {
+    throw new Error(`${label}必须是合法 JSON`);
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(`${label}必须是 JSON 对象`);
+  }
+  return parsed;
+}
+
+function collectTaskPayload() {
+  const groupName = $("#group-name").value.trim();
+  const taskName = $("#task-name").value.trim();
+  if (!groupName) throw new Error("任务组名称不能为空");
+  if (!taskName) throw new Error("任务名称不能为空");
+  const editors = [...document.querySelectorAll(".step-editor")];
+  if (!editors.length) throw new Error("至少需要一个步骤");
+  return {
+    group_name: groupName,
+    group_overrides: parseObjectJson($("#group-overrides").value, "L2 组级覆盖"),
+    name: taskName,
+    base_parameters: parseObjectJson($("#base-parameters").value, "L1 基础参数"),
+    steps: editors.map((editor, index) => {
+      const name = editor.querySelector(".step-name").value.trim();
+      if (!name) throw new Error(`步骤 ${index + 1} 名称不能为空`);
+      return {
+        name,
+        overrides: parseObjectJson(editor.querySelector(".step-overrides").value, `步骤 ${index + 1} 的 L3 覆盖`),
+      };
+    }),
+  };
+}
+
 async function loadTasks() {
   const response = await fetch("/api/tasks");
   if (!response.ok) throw new Error("任务列表加载失败");
@@ -117,8 +213,36 @@ $("#task-table-body").addEventListener("click", (event) => {
   if (button) runAction(button.dataset.action, Number(button.dataset.id));
 });
 $("#refresh-button").addEventListener("click", () => loadTasks().catch((error) => showResult(error.message, true)));
-$("#seed-button").addEventListener("click", async () => {
-  try { await request("/api/demo/seed", { method: "POST" }); showResult("演示任务已准备"); await loadTasks(); }
+$("#open-task-dialog").addEventListener("click", openTaskDialog);
+$("#close-task-dialog").addEventListener("click", closeTaskDialog);
+$("#cancel-task-dialog").addEventListener("click", closeTaskDialog);
+taskDialog.addEventListener("click", (event) => {
+  if (event.target === taskDialog) closeTaskDialog();
+});
+taskDialog.addEventListener("cancel", () => setTaskFormError());
+$("#add-step-button").addEventListener("click", () => {
+  const container = $("#steps-container");
+  container.appendChild(createStepEditor(container.children.length));
+  renumberStepEditors();
+});
+$("#task-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = $("#create-task-button");
+  button.disabled = true;
+  setTaskFormError();
+  try {
+    const task = await request("/api/tasks", { method: "POST", body: JSON.stringify(collectTaskPayload()) });
+    closeTaskDialog();
+    showResult(`已创建任务 #${task.id}`);
+    await loadTasks();
+  } catch (error) {
+    setTaskFormError(error.message);
+  } finally {
+    button.disabled = false;
+  }
+});
+$("#reset-demo-button").addEventListener("click", async () => {
+  try { await request("/api/demo/seed", { method: "POST" }); showResult("演示任务已重置"); await loadTasks(); }
   catch (error) { showResult(error.message, true); }
 });
 $("#claim-button").addEventListener("click", async () => {

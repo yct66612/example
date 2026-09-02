@@ -18,7 +18,8 @@
         <label for="worker-id">Worker ID</label>
         <input id="worker-id" value="dashboard-worker" maxlength="100">
         <button id="refresh-button" type="button">刷新</button>
-        <button id="seed-button" type="button">创建演示任务</button>
+        <button id="reset-demo-button" type="button">重置演示任务</button>
+        <button id="open-task-dialog" type="button">新建任务</button>
         <button id="claim-button" type="button" class="primary">认领下一个任务</button>
       </div>
     </header>
@@ -63,6 +64,55 @@
       </aside>
     </section>
   </main>
+
+  <dialog id="task-dialog" aria-labelledby="task-dialog-title">
+    <form id="task-form">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">任务配置</p>
+          <h2 id="task-dialog-title">新建任务</h2>
+        </div>
+        <button id="close-task-dialog" class="icon-button" type="button" aria-label="关闭">×</button>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          任务组名称
+          <input id="group-name" name="group_name" maxlength="100" required value="新客户组">
+        </label>
+        <label>
+          任务名称
+          <input id="task-name" name="task_name" maxlength="150" required value="新任务">
+        </label>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          L1 基础参数 JSON
+          <textarea id="base-parameters" rows="5" spellcheck="false">{}</textarea>
+        </label>
+        <label>
+          L2 组级覆盖 JSON
+          <textarea id="group-overrides" rows="5" spellcheck="false">{}</textarea>
+        </label>
+      </div>
+
+      <div class="steps-header">
+        <div>
+          <h3>执行步骤</h3>
+          <p>步骤按从上到下的顺序执行，L3 覆盖会向后持续生效。</p>
+        </div>
+        <button id="add-step-button" type="button">添加步骤</button>
+      </div>
+      <div id="steps-container" class="steps-container"></div>
+
+      <p id="task-form-error" class="form-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button id="cancel-task-dialog" type="button">取消</button>
+        <button id="create-task-button" class="primary" type="submit">创建任务</button>
+      </div>
+    </form>
+  </dialog>
   <script src="/static/app.js"></script>
 </body>
 </html>

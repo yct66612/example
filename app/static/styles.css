@@ -19,6 +19,7 @@ button:hover { border-color: var(--blue); color: var(--blue); }
 button:disabled { cursor: not-allowed; opacity: .55; }
 button.primary { border-color: var(--blue); background: var(--blue); color: #fff; }
 input { width: 150px; border: 1px solid #b9c4ce; border-radius: 5px; padding: 8px 10px; }
+textarea { width: 100%; resize: vertical; border: 1px solid #b9c4ce; border-radius: 5px; padding: 9px 10px; color: #17212b; background: #fff; font: 13px/1.5 Consolas, "SFMono-Regular", monospace; }
 
 .page-shell { max-width: 1440px; margin: 0 auto; padding: 28px 32px 44px; }
 .page-header { display: flex; justify-content: space-between; gap: 24px; align-items: end; border-bottom: 1px solid var(--border); padding-bottom: 22px; }
@@ -68,6 +69,28 @@ pre { margin: 0; overflow-x: auto; background: #f7f9fa; padding: 10px; font-size
 .result { max-width: 220px; color: var(--green); font-size: 12px; }
 .result.error { color: var(--red); }
 
+dialog { width: min(760px, calc(100vw - 32px)); max-height: min(860px, calc(100vh - 32px)); padding: 0; border: 1px solid var(--border); border-radius: 7px; color: #17212b; box-shadow: 0 18px 55px rgba(23, 33, 43, .22); }
+dialog::backdrop { background: rgba(23, 33, 43, .42); }
+#task-form { padding: 22px; overflow-y: auto; }
+.dialog-header, .steps-header, .dialog-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.dialog-header { padding-bottom: 17px; border-bottom: 1px solid var(--border); }
+.dialog-header h2 { margin-bottom: 0; }
+.icon-button { width: 34px; height: 34px; padding: 0; border-radius: 50%; font-size: 22px; line-height: 1; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 17px; }
+.form-grid label, .step-fields label { display: grid; gap: 6px; color: #44515d; font-size: 13px; font-weight: 650; }
+.form-grid input { width: 100%; }
+.steps-header { margin-top: 22px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+.steps-header h3 { margin: 0 0 4px; font-size: 15px; }
+.steps-header p { margin: 0; color: var(--muted); font-size: 12px; font-weight: 400; }
+.steps-container { display: grid; gap: 10px; padding-top: 12px; }
+.step-editor { border: 1px solid var(--border); border-radius: 5px; padding: 12px; background: #f9fafb; }
+.step-editor-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.step-number { color: var(--blue); font-size: 13px; font-weight: 700; }
+.remove-step-button { padding: 5px 8px; font-size: 12px; }
+.step-fields { display: grid; grid-template-columns: minmax(150px, .7fr) minmax(0, 1.3fr); gap: 12px; }
+.form-error { min-height: 20px; margin: 14px 0 0; color: var(--red); font-size: 13px; }
+.dialog-actions { justify-content: flex-end; margin-top: 8px; padding-top: 15px; border-top: 1px solid var(--border); }
+
 @media (max-width: 900px) {
   .page-shell { padding: 22px 16px 35px; }
   .page-header { align-items: start; flex-direction: column; }
@@ -78,4 +101,6 @@ pre { margin: 0; overflow-x: auto; background: #f7f9fa; padding: 10px; font-size
   .summary-grid { grid-template-columns: repeat(2, 1fr); }
   .summary-item:last-child { grid-column: span 2; }
   .header-actions input { width: 100%; }
+  .form-grid, .step-fields { grid-template-columns: 1fr; }
+  #task-form { padding: 17px; }
 }
