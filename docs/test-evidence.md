@@ -14,7 +14,7 @@
 
 ```text
 Ruff：通过
-Python 全量测试：21 passed
+Python 全量测试：23 passed
 Python 编译检查：通过
 JavaScript 语法检查：通过
 FastAPI 根页面访问：HTTP 200
@@ -23,7 +23,7 @@ FastAPI 根页面访问：HTTP 200
 完整 `pytest -v` 实际结果：
 
 ```text
-21 passed
+23 passed
 ```
 
 集成测试使用本地 MySQL 8.0.31 的 `task_scheduler_test` 数据库，包含真实多进程认领和并发幂等上报。

@@ -25,6 +25,18 @@ def test_empty_step_override_does_not_create_an_absent_key() -> None:
     assert resolve_step_parameters({}, {}, [{"new_key": ""}]) == [{}]
 
 
+def test_group_empty_string_is_a_literal_override() -> None:
+    assert resolve_step_parameters({"tone": "formal"}, {"tone": ""}, [{}]) == [{"tone": ""}]
+
+
+def test_step_override_can_introduce_a_sticky_new_key() -> None:
+    assert resolve_step_parameters({}, {}, [{"channel": "email"}, {}, {"channel": "sms"}]) == [
+        {"channel": "email"},
+        {"channel": "email"},
+        {"channel": "sms"},
+    ]
+
+
 def test_resolved_snapshots_are_independent() -> None:
     resolved = resolve_step_parameters({"count": 1}, {}, [{}, {}])
 
