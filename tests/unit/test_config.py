@@ -11,6 +11,7 @@ def test_settings_accept_separate_runtime_and_test_databases() -> None:
 
     assert settings.database_url.endswith("/scheduler")
     assert settings.test_database_url.endswith("/scheduler_test")
+    assert settings.app_instance == "local"
 
 
 def test_test_database_must_end_with_test() -> None:
