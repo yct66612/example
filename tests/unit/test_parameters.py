@@ -167,3 +167,44 @@ def test_deep_nested_override_preserves_sibling_and_grandchild_values() -> None:
             }
         },
     ]
+
+
+def test_string_number_boolean_and_array_values_are_preserved_and_overridden() -> None:
+    resolved = resolve_step_parameters(
+        {
+            "名称": "空调",
+            "温度": 24,
+            "开启": True,
+            "标签": ["客厅", "节能"],
+        },
+        {"温度": 22, "开启": False},
+        [
+            {"名称": "智能空调", "标签": ["卧室"]},
+            {"温度": 20, "开启": True},
+        ],
+    )
+
+    assert resolved == [
+        {
+            "名称": "智能空调",
+            "温度": 22,
+            "开启": False,
+            "标签": ["卧室"],
+        },
+        {
+            "名称": "智能空调",
+            "温度": 20,
+            "开启": True,
+            "标签": ["卧室"],
+        },
+    ]
+
+
+def test_array_values_are_replaced_as_a_whole_not_merged_by_index() -> None:
+    resolved = resolve_step_parameters(
+        {"标签": ["普通", "新客"]},
+        {},
+        [{"标签": ["高价值"]}],
+    )
+
+    assert resolved == [{"标签": ["高价值"]}]

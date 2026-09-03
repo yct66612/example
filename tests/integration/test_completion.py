@@ -1,9 +1,13 @@
+import multiprocessing
 import threading
+from queue import Empty
 
 import pytest
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.config import get_settings
+from app.db.session import build_engine
 from app.domain.enums import TaskStatus
 from app.models.task import StepExecutionLog, Task, TaskGroup, TaskStep
 from app.services.claiming import claim_next_task
@@ -162,3 +166,73 @@ def test_five_independent_connections_advance_one_step_once(
     assert task is not None
     assert task.current_step_index == 1
     assert task.status == TaskStatus.RUNNING
+
+
+def _distributed_completion_worker(
+    database_url: str,
+    task_id: int,
+    worker_id: str,
+    barrier,
+    result_queue,
+) -> None:
+    engine = build_engine(database_url)
+    factory = sessionmaker(bind=engine, expire_on_commit=False)
+    try:
+        with factory() as session:
+            barrier.wait(timeout=20)
+            result = complete_step(session, task_id, 0, True, worker_id)
+            result_queue.put({"status": str(result.task_status), "advanced": result.advanced})
+    except BaseException as exc:  # pragma: no cover - surfaced by parent assertion
+        result_queue.put({"error": f"{type(exc).__name__}: {exc}"})
+    finally:
+        engine.dispose()
+
+
+def test_five_real_processes_idempotently_report_the_same_step(db_session: Session) -> None:
+    task_id, worker_id = _seed_claimed_task(db_session, step_count=1)
+    start_task(db_session, task_id, worker_id)
+    database_url = get_settings().test_database_url
+    context = multiprocessing.get_context("spawn")
+    barrier = context.Barrier(5)
+    result_queue = context.Queue()
+    processes = [
+        context.Process(
+            target=_distributed_completion_worker,
+            args=(database_url, task_id, worker_id, barrier, result_queue),
+        )
+        for _ in range(5)
+    ]
+
+    for process in processes:
+        process.start()
+    for process in processes:
+        process.join(timeout=30)
+        assert process.exitcode == 0
+
+    results: list[dict] = []
+    for _ in processes:
+        try:
+            results.append(result_queue.get(timeout=10))
+        except Empty:
+            break
+
+    assert len(results) == 5
+    assert all("error" not in result for result in results)
+    assert sum(result["advanced"] for result in results) == 1
+
+    factory = sessionmaker(bind=build_engine(database_url), expire_on_commit=False)
+    with factory() as check_session:
+        log_count = check_session.scalar(
+            select(func.count())
+            .select_from(StepExecutionLog)
+            .where(
+                StepExecutionLog.task_id == task_id,
+                StepExecutionLog.step_index == 0,
+            )
+        )
+        task = check_session.get(Task, task_id)
+
+    assert log_count == 1
+    assert task is not None
+    assert task.current_step_index == 1
+    assert task.status == TaskStatus.DONE

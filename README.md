@@ -37,6 +37,7 @@ Copy-Item .env.example .env
 ## 已验证边界
 
 - L2/L3 对嵌套 JSON 递归深度合并，不会覆盖整个对象；L2 空字符串按字面值覆盖，L3 任意层级空字符串表示不覆盖；L3 非空值向后粘性生效并可新增 key。
+- 参数值支持字符串、数字、布尔值、数组和嵌套对象；数组作为整体值替换，不按下标合并。
 - 未来步骤、未启动任务不能上报；错误 worker 不能启动或完成任务；`running` 任务不能重复启动。
 - 同一步骤重复上报只有一条日志；成功日志不能被失败覆盖；重复请求只推进一次。
 - MySQL `1205/1213` 会回滚并有限重试；重置演示任务不会删除其他组的同名自定义任务。
@@ -48,9 +49,10 @@ Copy-Item .env.example .env
 .\.venv\Scripts\pytest -v
 .\.venv\Scripts\python scripts\run_claim_evidence.py --tasks 100 --workers 10 --runs 10
 .\.venv\Scripts\python scripts\run_completion_evidence.py
+.\.venv\Scripts\python scripts\run_distributed_completion_evidence.py --processes 5 --runs 10
 ```
 
-已验证：`40 passed`；10 个真实进程累计认领 1000 个任务，重复 0、遗漏 0；5 次重复完成上报最终 1 条日志且状态为 `done`。详细输出和截图见 `docs/test-evidence.md`。
+已验证：`43 passed`；10 个真实进程累计认领 1000 个任务，重复 0、遗漏 0；5 个真实进程 10 轮共重复上报 50 次，最终日志 10 条、实际推进 10 次，未出现重复日志。参数测试覆盖字符串、数字、布尔值、数组和多层嵌套对象。详细输出和截图见 `docs/test-evidence.md`。
 
 ## 明确删减项
 

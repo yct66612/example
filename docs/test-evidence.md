@@ -14,7 +14,7 @@
 
 ```text
 Ruff：通过
-Python 全量测试：40 passed
+Python 全量测试：43 passed
 Python 编译检查：通过
 JavaScript 语法检查：通过
 FastAPI 根页面访问：HTTP 200
@@ -23,7 +23,7 @@ FastAPI 根页面访问：HTTP 200
 完整 `pytest -v` 实际结果：
 
 ```text
-40 passed
+43 passed
 ```
 
 集成测试使用本地 MySQL 8.0.31 的 `task_scheduler_test` 数据库，包含真实多进程认领和并发幂等上报。
@@ -35,6 +35,7 @@ FastAPI 根页面访问：HTTP 200
 .\.venv\Scripts\pytest -v
 .\.venv\Scripts\python scripts/run_claim_evidence.py --tasks 100 --workers 10 --runs 10
 .\.venv\Scripts\python scripts/run_completion_evidence.py
+.\.venv\Scripts\python scripts/run_distributed_completion_evidence.py --processes 5 --runs 10
 ```
 
 已采集证据：
@@ -47,6 +48,20 @@ FastAPI 根页面访问：HTTP 200
 最终日志行数：1
 最终任务状态：done
 ```
+
+分布式幂等证据：
+
+```text
+真实进程数：5，运行轮数：10
+重复上报总数：50
+最终日志总数：10
+实际推进总数：10
+最终任务状态：done
+```
+
+每个进程使用独立 Engine、Session 和 MySQL 连接，并通过进程 Barrier 同步后上报同一个步骤。
+
+参数值类型测试覆盖：字符串、整数、布尔值、数组、嵌套对象；数组按整体替换，嵌套对象按 key 递归合并。
 
 ## 浏览器端到端演示
 
