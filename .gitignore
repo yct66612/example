@@ -1,4 +1,5 @@
 .env
+.env.distributed
 .venv/
 *.egg-info/
 __pycache__/
@@ -9,4 +10,5 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 *.log
+load-test-results/
 实习笔试apikey.txt
