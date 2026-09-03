@@ -42,6 +42,7 @@ class TaskListResponse(TaskResponse):
 
 class ClaimRequest(BaseModel):
     worker_id: str = Field(min_length=1, max_length=100)
+    task_name_prefix: str | None = Field(default=None, min_length=1, max_length=150)
 
 
 class ParameterResponse(BaseModel):

@@ -85,6 +85,25 @@ def test_claim_returns_no_content_when_no_pending_task_exists(client: TestClient
     assert response.status_code == 204
 
 
+def test_claim_can_be_limited_to_a_task_name_prefix(client: TestClient) -> None:
+    first_payload = _task_payload("load-group-a")
+    first_payload["name"] = "other-task"
+    second_payload = _task_payload("load-group-b")
+    second_payload["name"] = "load-batch-task"
+    other = client.post("/api/tasks", json=first_payload)
+    expected = client.post("/api/tasks", json=second_payload)
+    assert other.status_code == 201
+    assert expected.status_code == 201
+
+    response = client.post(
+        "/api/tasks/claim",
+        json={"worker_id": "load-worker", "task_name_prefix": "load-batch-"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["id"] == expected.json()["id"]
+
+
 def test_nested_parameter_details_preserve_unmentioned_values(client: TestClient) -> None:
     payload = {
         "group_name": "家庭影音组",

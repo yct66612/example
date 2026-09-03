@@ -45,7 +45,11 @@ def list_tasks_endpoint(session: Session = Depends(get_session)) -> list[TaskRes
 def claim_task_endpoint(
     payload: ClaimRequest, session: Session = Depends(get_session)
 ) -> TaskResponse | Response:
-    task = claim_next_task(session, payload.worker_id)
+    task = claim_next_task(
+        session,
+        payload.worker_id,
+        name_prefix=payload.task_name_prefix,
+    )
     if task is None:
         return Response(status_code=status.HTTP_204_NO_CONTENT)
     return task_response(get_task(session, task.id))
