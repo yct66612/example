@@ -28,6 +28,8 @@ def test_claim_summary_detects_duplicates_missing_and_instances() -> None:
     assert summary["missing_ids"] == [12]
     assert summary["unexpected_ids"] == []
     assert summary["instances"] == {"app-1": 2, "app-2": 1}
+    assert verifier.has_expected_instances(summary["instances"], 2) is True
+    assert verifier.has_expected_instances(summary["instances"], 3) is False
 
 
 def test_test_database_guard_rejects_runtime_database() -> None:
@@ -39,3 +41,16 @@ def test_test_database_guard_rejects_runtime_database() -> None:
         assert "_test" in str(exc)
     else:
         raise AssertionError("runtime database URL should be rejected")
+
+
+def test_load_test_scripts_accept_a_distributed_environment_file() -> None:
+    preparer = _load_script("prepare_http_load_test.py")
+    verifier = _load_script("verify_http_load_test.py")
+
+    assert preparer.build_parser().parse_args(
+        ["--env-file", ".env.distributed"]
+    ).env_file == Path(".env.distributed")
+    assert verifier.build_parser().parse_args(
+        ["--env-file", ".env.distributed"]
+    ).env_file == Path(".env.distributed")
+    assert verifier.build_parser().parse_args([]).expected_instances == 3

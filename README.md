@@ -26,6 +26,10 @@ Copy-Item .env.example .env
 
 点击任务的“参数”可以查看 L1 基础值、L2 组级覆盖、每个步骤的 L3 覆盖和最终生效值；例如 L1 的 `温度=24度` 经步骤 1 覆盖后变为 `20度`，步骤 2 的空字符串会显示为“沿用当前值”。参数面板会把这些来源按表格横向对齐，便于答辩时解释每一步的变化。
 
+## 多实例压测
+
+仓库包含 `docker-compose.distributed.yml`、三个 FastAPI 实例、Nginx、共享 MySQL、两份 JMeter 计划和数据库校验脚本。本机没有 Docker 时可运行 `.\.venv\Scripts\python scripts\run_local_distributed.py` 启动等价的三实例轮询环境。完整操作见 `docs/distributed-load-test.md`。
+
 ## 选型与架构
 
 - **Python 3.11**：团队熟悉，FastAPI 类型清晰、开发快；pytest 适合本题需要的单元、集成和多进程测试。
@@ -60,7 +64,7 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python scripts\run_distributed_completion_evidence.py --processes 5 --runs 10 --keep-data
 ```
 
-已验证：`45 passed`；10 个真实进程累计认领 1000 个任务，重复 0、遗漏 0；5 个真实进程 10 轮共重复上报 50 次，最终日志 10 条、实际推进 10 次，未出现重复日志。参数测试覆盖字符串、数字、布尔值、数组和多层嵌套对象。详细输出和截图见 `docs/test-evidence.md`。
+已验证：`60 passed`；10 个真实进程累计认领 1000 个任务，重复 0、遗漏 0；HTTP 多实例测试 100 次认领无重复无遗漏，20 次同步完成最终只有 1 条日志和 1 次推进。详细输出和截图见 `docs/test-evidence.md`。
 
 ## 明确删减项
 

@@ -9,7 +9,7 @@ def test_compose_defines_mysql_migration_three_apps_and_nginx() -> None:
 
     for service in ("mysql", "migrate", "app-1", "app-2", "app-3", "nginx"):
         assert f"  {service}:" in compose
-    assert "alembic upgrade head" in compose
+    assert "python scripts/migrate_databases.py" in compose
     assert "condition: service_healthy" in compose
     assert "condition: service_completed_successfully" in compose
     assert "APP_INSTANCE: app-1" in compose
@@ -33,8 +33,18 @@ def test_container_image_runs_as_non_root_user() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
     assert "FROM python:3.11-slim" in dockerfile
+    assert "COPY scripts ./scripts" in dockerfile
     assert "USER app" in dockerfile
     assert 'CMD ["uvicorn", "app.main:app"' in dockerfile
+
+
+def test_container_application_and_host_load_tools_share_a_dedicated_test_database() -> None:
+    environment = (ROOT / ".env.distributed.example").read_text(encoding="utf-8")
+
+    assert "MYSQL_DATABASE=task_scheduler_distributed_test" in environment
+    assert "@mysql:3306/task_scheduler_distributed_test" in environment
+    assert "@127.0.0.1:3307/task_scheduler_distributed_test" in environment
+    assert "TEST_DATABASE_URL=" in environment
 
 
 def test_claim_jmeter_plan_records_task_and_instance_results() -> None:

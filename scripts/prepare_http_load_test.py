@@ -9,7 +9,7 @@ from uuid import uuid4
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import sessionmaker
 
-from app.config import get_settings
+from app.config import Settings, get_settings
 from app.db.session import build_engine
 from app.models.task import Task, TaskGroup, TaskStep
 from app.services.claiming import claim_next_task
@@ -23,6 +23,13 @@ def require_test_database_url(database_url: str) -> str:
     if not database_name.endswith("_test"):
         raise ValueError("load tests require a database name ending with _test")
     return database_url
+
+
+def configured_load_test_database_url(env_file: Path | None = None) -> str:
+    settings = Settings(_env_file=env_file) if env_file is not None else get_settings()
+    return require_test_database_url(
+        settings.load_test_database_url or settings.test_database_url
+    )
 
 
 def prepare_load_test(database_url: str, claim_count: int, output_dir: Path) -> dict:
@@ -129,13 +136,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="准备隔离的 HTTP 分布式压测数据")
     parser.add_argument("--claim-tasks", type=int, default=100)
     parser.add_argument("--output-dir", type=Path, default=Path("load-test-results"))
+    parser.add_argument("--env-file", type=Path)
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
     try:
-        database_url = require_test_database_url(get_settings().test_database_url)
+        database_url = configured_load_test_database_url(args.env_file)
         context = prepare_load_test(database_url, args.claim_tasks, args.output_dir)
     except (ValueError, RuntimeError) as exc:
         raise SystemExit(str(exc)) from exc

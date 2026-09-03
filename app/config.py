@@ -8,6 +8,7 @@ from sqlalchemy.engine import make_url
 class Settings(BaseSettings):
     database_url: str
     test_database_url: str
+    load_test_database_url: str | None = None
     app_instance: str = "local"
 
     model_config = SettingsConfigDict(

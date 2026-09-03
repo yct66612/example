@@ -14,7 +14,7 @@
 
 ```text
 Ruff：通过
-Python 全量测试：45 passed
+Python 全量测试：60 passed
 Python 编译检查：通过
 JavaScript 语法检查：通过
 FastAPI 根页面访问：HTTP 200
@@ -23,7 +23,7 @@ FastAPI 根页面访问：HTTP 200
 完整 `pytest -v` 实际结果：
 
 ```text
-45 passed
+60 passed
 ```
 
 集成测试使用本地 MySQL 8.0.31 的 `task_scheduler_test` 数据库，包含真实多进程认领和并发幂等上报。
@@ -77,6 +77,23 @@ ORDER BY task_id DESC;
 每个进程使用独立 Engine、Session 和 MySQL 连接，并通过进程 Barrier 同步后上报同一个步骤。
 
 参数值类型测试覆盖：字符串、整数、布尔值、数组、嵌套对象；数组按整体替换，嵌套对象按 key 递归合并。
+
+## HTTP 多实例实测
+
+2026-09-03 使用三个独立 Uvicorn 进程（`app-1/app-2/app-3`）、本地轮询入口 `127.0.0.1:8080`、共享 MySQL 和 JMeter 5.6.3 执行完整 HTTP 链路。Docker/Nginx 配置已提供，但本机未安装 Docker，因此没有声称完成容器运行验证。
+
+```text
+认领请求：100，成功：100，错误：0，重复：0，遗漏：0
+认领实例分布：app-1=33，app-2=34，app-3=33
+数据库 claimed：100
+
+同一步骤完成请求：20，成功：20，错误：0
+完成实例分布：app-1=7，app-2=6，app-3=7
+数据库日志：1，current_step_index=1，status=done
+最终校验：valid=true
+```
+
+JMeter HTML 报告已生成在本地忽略目录 `load-test-results/multi-instance/claim-report` 和 `load-test-results/multi-instance/completion-report`。认领与完成报告错误率均为 0%。
 
 ## 浏览器端到端演示
 

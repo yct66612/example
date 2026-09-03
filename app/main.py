@@ -12,7 +12,7 @@ from app.config import get_settings
 
 app = FastAPI(title="任务调度看板")
 app.include_router(router)
-access_logger = logging.getLogger("app.access")
+access_logger = logging.getLogger("uvicorn.error")
 
 
 @app.middleware("http")

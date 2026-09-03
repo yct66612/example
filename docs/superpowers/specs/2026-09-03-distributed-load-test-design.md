@@ -8,7 +8,7 @@
 
 容器编排包含 MySQL、一次性 Alembic 迁移服务、三个 FastAPI 服务和一个 Nginx。FastAPI 保持无状态，任务状态、认领信息和执行日志继续只存放在 MySQL。Nginx 使用轮询上游并记录 `$upstream_addr`，FastAPI 在响应中返回 `X-App-Instance` 与 `X-Request-ID`。
 
-本机没有 Docker 和 Nginx，因此本次会完成并静态验证容器配置，同时使用已安装的 JMeter 5.6.3 对本地 FastAPI/MySQL 实际执行测试计划。安装 Docker 后可直接切换到 Nginx 的 `8080` 入口运行相同 JMX。
+本机没有 Docker 和 Nginx，因此容器配置执行静态验证；实际测试使用仓库内本地轮询代理连接三个独立 FastAPI 进程，再由 JMeter 5.6.3 通过 `8080` 入口执行相同 JMX。安装 Docker 后可直接把本地代理替换为 Nginx。
 
 ## 压测场景
 

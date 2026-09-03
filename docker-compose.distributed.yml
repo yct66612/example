@@ -43,7 +43,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    command: alembic upgrade head
+    command: python scripts/migrate_databases.py
     env_file:
       - .env.distributed
     environment:
