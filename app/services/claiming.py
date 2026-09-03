@@ -14,13 +14,21 @@ def _is_transient_lock_error(error: OperationalError) -> bool:
     return getattr(original, "args", [None])[0] in {1205, 1213}
 
 
-def claim_next_task(session: Session, worker_id: str, max_retries: int = 5) -> Task | None:
+def claim_next_task(
+    session: Session,
+    worker_id: str,
+    max_retries: int = 5,
+    name_prefix: str | None = None,
+) -> Task | None:
     for attempt in range(max_retries + 1):
         try:
             with session.begin():
+                conditions = [Task.status == TaskStatus.PENDING]
+                if name_prefix is not None:
+                    conditions.append(Task.name.like(f"{name_prefix}%"))
                 statement = (
                     select(Task)
-                    .where(Task.status == TaskStatus.PENDING)
+                    .where(*conditions)
                     .order_by(Task.created_at, Task.id)
                     .limit(1)
                     .with_for_update(skip_locked=True)

@@ -14,7 +14,7 @@
 
 ```text
 Ruff：通过
-Python 全量测试：43 passed
+Python 全量测试：45 passed
 Python 编译检查：通过
 JavaScript 语法检查：通过
 FastAPI 根页面访问：HTTP 200
@@ -23,7 +23,7 @@ FastAPI 根页面访问：HTTP 200
 完整 `pytest -v` 实际结果：
 
 ```text
-43 passed
+45 passed
 ```
 
 集成测试使用本地 MySQL 8.0.31 的 `task_scheduler_test` 数据库，包含真实多进程认领和并发幂等上报。
@@ -36,6 +36,21 @@ FastAPI 根页面访问：HTTP 200
 .\.venv\Scripts\python scripts/run_claim_evidence.py --tasks 100 --workers 10 --runs 10
 .\.venv\Scripts\python scripts/run_completion_evidence.py
 .\.venv\Scripts\python scripts/run_distributed_completion_evidence.py --processes 5 --runs 10
+```
+
+默认执行会清理本批证据数据。需要在数据库中现场查看时追加 `--keep-data`；认领脚本只处理本次随机前缀对应的任务，不会认领以前保留的数据或其他测试任务。
+
+```sql
+SELECT id, name, status, worker_id, claimed_at, current_step_index
+FROM tasks
+WHERE name LIKE 'evidence-%' OR name LIKE 'completion-evidence-%'
+   OR name LIKE 'distributed-evidence-%'
+ORDER BY id DESC;
+
+SELECT task_id, step_index, COUNT(*) AS log_count, MAX(success) AS success
+FROM step_execution_logs
+GROUP BY task_id, step_index
+ORDER BY task_id DESC;
 ```
 
 已采集证据：

@@ -64,6 +64,30 @@ def test_claims_oldest_pending_task_once(db_session: Session) -> None:
     assert statuses == [TaskStatus.CLAIMED, TaskStatus.CLAIMED]
 
 
+def test_claim_can_be_limited_to_an_evidence_batch(db_session: Session) -> None:
+    group = TaskGroup(name="claim-prefix-group", parameter_overrides={})
+    own_task = Task(
+        name="evidence-own-task",
+        group=group,
+        base_parameters={},
+        steps=[TaskStep(step_index=0, name="step", parameter_overrides={})],
+    )
+    other_task = Task(
+        name="user-task",
+        group=group,
+        base_parameters={},
+        steps=[TaskStep(step_index=0, name="step", parameter_overrides={})],
+    )
+    db_session.add_all([own_task, other_task])
+    db_session.commit()
+
+    claimed = claim_next_task(db_session, "worker-a", name_prefix="evidence-")
+
+    assert claimed is not None
+    assert claimed.id == own_task.id
+    assert db_session.get(Task, other_task.id).status == TaskStatus.PENDING
+
+
 def test_ten_real_processes_claim_each_task_exactly_once(db_session: Session) -> None:
     task_ids = set(_seed_tasks(db_session, 100))
     database_url = get_settings().test_database_url

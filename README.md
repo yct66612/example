@@ -52,7 +52,15 @@ Copy-Item .env.example .env
 .\.venv\Scripts\python scripts\run_distributed_completion_evidence.py --processes 5 --runs 10
 ```
 
-已验证：`43 passed`；10 个真实进程累计认领 1000 个任务，重复 0、遗漏 0；5 个真实进程 10 轮共重复上报 50 次，最终日志 10 条、实际推进 10 次，未出现重复日志。参数测试覆盖字符串、数字、布尔值、数组和多层嵌套对象。详细输出和截图见 `docs/test-evidence.md`。
+证据脚本默认在校验后删除本批测试数据。答辩时追加 `--keep-data` 可保留记录，并在控制台输出任务 ID 或批次前缀：
+
+```powershell
+.\.venv\Scripts\python scripts\run_claim_evidence.py --tasks 100 --workers 10 --keep-data
+.\.venv\Scripts\python scripts\run_completion_evidence.py --keep-data
+.\.venv\Scripts\python scripts\run_distributed_completion_evidence.py --processes 5 --runs 10 --keep-data
+```
+
+已验证：`45 passed`；10 个真实进程累计认领 1000 个任务，重复 0、遗漏 0；5 个真实进程 10 轮共重复上报 50 次，最终日志 10 条、实际推进 10 次，未出现重复日志。参数测试覆盖字符串、数字、布尔值、数组和多层嵌套对象。详细输出和截图见 `docs/test-evidence.md`。
 
 ## 明确删减项
 

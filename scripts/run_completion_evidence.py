@@ -3,6 +3,7 @@
 import argparse
 import concurrent.futures
 import os
+import uuid
 
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
@@ -26,9 +27,15 @@ def _require_test_url() -> str:
     return url
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="输出重复完成上报幂等证据")
     parser.add_argument("--reports", type=int, default=5)
+    parser.add_argument("--keep-data", action="store_true", help="保留证据任务和完成日志")
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
     if args.reports < 2:
         raise SystemExit("reports 必须至少为 2")
@@ -36,17 +43,20 @@ def main() -> None:
     database_url = _require_test_url()
     engine = create_engine(database_url, pool_pre_ping=True)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
+    prefix = f"completion-evidence-{os.getpid()}-{uuid.uuid4().hex[:8]}-"
     with factory() as session:
-        group = TaskGroup(name=f"completion-evidence-{os.getpid()}", parameter_overrides={})
+        group = TaskGroup(name=f"{prefix}group", parameter_overrides={})
         task = Task(
-            name=f"completion-evidence-{os.getpid()}",
+            name=f"{prefix}task",
             group=group,
             base_parameters={},
             steps=[TaskStep(step_index=0, name="step", parameter_overrides={})],
         )
         session.add(task)
         session.commit()
-        claimed = claim_next_task(session, "completion-evidence-worker")
+        claimed = claim_next_task(
+            session, "completion-evidence-worker", name_prefix=prefix
+        )
         assert claimed is not None
         start_task(session, claimed.id, claimed.worker_id or "")
         task_id = claimed.id
@@ -68,6 +78,7 @@ def main() -> None:
         print(f"完成上报次数：{args.reports}")
         print(f"最终日志行数：{log_count}")
         print(f"最终任务状态：{task.status if task else 'missing'}")
+        print(f"证据任务 ID：{task_id}")
         if (
             log_count != 1
             or task is None
@@ -75,8 +86,15 @@ def main() -> None:
             or task.status != TaskStatus.DONE
         ):
             raise SystemExit(1)
-        session.delete(task)
-        session.commit()
+        if not args.keep_data:
+            group = session.get(TaskGroup, task.group_id)
+            session.delete(task)
+            session.flush()
+            if group is not None:
+                session.delete(group)
+            session.commit()
+        else:
+            print("证据数据：已保留在 task_scheduler_test.tasks 和 step_execution_logs")
     engine.dispose()
 
 

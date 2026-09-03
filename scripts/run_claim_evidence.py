@@ -3,6 +3,7 @@
 import argparse
 import multiprocessing
 import os
+import uuid
 from queue import Empty
 
 from sqlalchemy import create_engine, delete, func, select
@@ -25,7 +26,7 @@ def _require_test_url() -> str:
     return url
 
 
-def _worker(database_url: str, worker_id: str, result_queue) -> None:
+def _worker(database_url: str, worker_id: str, name_prefix: str, result_queue) -> None:
     engine = create_engine(
         database_url, pool_pre_ping=True, isolation_level="READ COMMITTED"
     )
@@ -34,7 +35,7 @@ def _worker(database_url: str, worker_id: str, result_queue) -> None:
         with factory() as session:
             claimed_ids: list[int] = []
             while True:
-                task = claim_next_task(session, worker_id)
+                task = claim_next_task(session, worker_id, name_prefix=name_prefix)
                 if task is None:
                     break
                 claimed_ids.append(task.id)
@@ -44,10 +45,6 @@ def _worker(database_url: str, worker_id: str, result_queue) -> None:
 
 
 def _prepare_tasks(session: Session, count: int, prefix: str) -> set[int]:
-    for model in (Task, TaskGroup):
-        session.execute(delete(model))
-    session.flush()
-
     group = TaskGroup(name=f"{prefix}group", parameter_overrides={})
     tasks = [
         Task(
@@ -63,17 +60,26 @@ def _prepare_tasks(session: Session, count: int, prefix: str) -> set[int]:
     return {task.id for task in tasks}
 
 
-def run_once(database_url: str, count: int, workers: int, run_number: int) -> tuple[int, int, int]:
+def run_once(
+    database_url: str,
+    count: int,
+    workers: int,
+    run_number: int,
+    keep_data: bool,
+) -> tuple[int, int, int, str]:
     engine = create_engine(database_url, pool_pre_ping=True)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
-    prefix = f"evidence-{os.getpid()}-{run_number}-"
+    prefix = f"evidence-{os.getpid()}-{run_number}-{uuid.uuid4().hex[:8]}-"
     with factory() as session:
         expected_ids = _prepare_tasks(session, count, prefix)
 
     context = multiprocessing.get_context("spawn")
     result_queue = context.Queue()
     processes = [
-        context.Process(target=_worker, args=(database_url, f"evidence-worker-{i}", result_queue))
+        context.Process(
+            target=_worker,
+            args=(database_url, f"evidence-worker-{i}", prefix, result_queue),
+        )
         for i in range(workers)
     ]
     for process in processes:
@@ -98,39 +104,53 @@ def run_once(database_url: str, count: int, workers: int, run_number: int) -> tu
             .select_from(Task)
             .where(Task.name.like(f"{prefix}%"), Task.status == TaskStatus.CLAIMED)
         )
-        session.execute(delete(Task).where(Task.name.like(f"{prefix}%")))
         group = session.scalar(select(TaskGroup).where(TaskGroup.name == f"{prefix}group"))
-        if group is not None:
-            session.delete(group)
-        session.commit()
+        if not keep_data:
+            session.execute(delete(Task).where(Task.name.like(f"{prefix}%")))
+            session.flush()
+            if group is not None:
+                session.delete(group)
+            session.commit()
     engine.dispose()
     if claimed_count != count:
         missing_count = max(missing_count, count - (claimed_count or 0))
-    return len(claimed_ids), duplicate_count, missing_count
+    return len(claimed_ids), duplicate_count, missing_count, prefix
 
 
-def main() -> None:
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="输出多进程唯一认领证据")
     parser.add_argument("--tasks", type=int, default=100)
     parser.add_argument("--workers", type=int, default=10)
     parser.add_argument("--runs", type=int, default=1)
+    parser.add_argument("--keep-data", action="store_true", help="保留证据任务和认领结果")
+    return parser
+
+
+def main() -> None:
+    parser = build_parser()
     args = parser.parse_args()
     if min(args.tasks, args.workers, args.runs) < 1:
         raise SystemExit("tasks、workers、runs 都必须大于 0")
 
     database_url = _require_test_url()
     total_claims = total_duplicates = total_missing = 0
+    preserved_prefixes: list[str] = []
     for run_number in range(args.runs):
-        claimed, duplicates, missing = run_once(
-            database_url, args.tasks, args.workers, run_number
+        claimed, duplicates, missing, prefix = run_once(
+            database_url, args.tasks, args.workers, run_number, args.keep_data
         )
         total_claims += claimed
         total_duplicates += duplicates
         total_missing += missing
+        if args.keep_data:
+            preserved_prefixes.append(prefix)
     print(f"任务数：{args.tasks}，Worker 数：{args.workers}，运行轮数：{args.runs}")
     print(f"总认领数：{total_claims}")
     print(f"重复认领数：{total_duplicates}")
     print(f"遗漏任务数：{total_missing}")
+    if args.keep_data:
+        print(f"保留批次前缀：{', '.join(preserved_prefixes)}")
+        print("证据数据：已保留在 task_scheduler_test.tasks")
     if total_duplicates or total_missing:
         raise SystemExit(1)
 
