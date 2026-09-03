@@ -1,4 +1,5 @@
 from pathlib import Path
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).parents[2]
 
@@ -34,3 +35,28 @@ def test_container_image_runs_as_non_root_user() -> None:
     assert "FROM python:3.11-slim" in dockerfile
     assert "USER app" in dockerfile
     assert 'CMD ["uvicorn", "app.main:app"' in dockerfile
+
+
+def test_claim_jmeter_plan_records_task_and_instance_results() -> None:
+    path = ROOT / "tests" / "jmeter" / "claim-concurrency.jmx"
+    ElementTree.parse(path)
+    plan = path.read_text(encoding="utf-8")
+
+    assert "/api/tasks/claim" in plan
+    assert "task_name_prefix" in plan
+    assert "claimPrefix" in plan
+    assert "claimResultsFile" in plan
+    assert "X-App-Instance" in plan
+
+
+def test_completion_jmeter_plan_synchronizes_duplicate_requests() -> None:
+    path = ROOT / "tests" / "jmeter" / "completion-idempotency.jmx"
+    ElementTree.parse(path)
+    plan = path.read_text(encoding="utf-8")
+
+    assert "SyncTimer" in plan
+    assert "/steps/0/complete" in plan
+    assert "taskId" in plan
+    assert "workerId" in plan
+    assert "completionResultsFile" in plan
+    assert "X-App-Instance" in plan
