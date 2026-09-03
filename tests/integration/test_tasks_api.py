@@ -83,3 +83,43 @@ def test_claim_returns_no_content_when_no_pending_task_exists(client: TestClient
     response = client.post("/api/tasks/claim", json={"worker_id": "worker-a"})
 
     assert response.status_code == 204
+
+
+def test_nested_parameter_details_preserve_unmentioned_values(client: TestClient) -> None:
+    payload = {
+        "group_name": "家庭影音组",
+        "group_overrides": {"设置": {"模式": "影院"}},
+        "name": "电影播放任务",
+        "base_parameters": {
+            "设置": {"音量": 60, "模式": "标准"},
+            "音乐": "流行",
+        },
+        "steps": [
+            {"name": "准备步骤", "overrides": {"设置": {"音量": 80}}},
+            {
+                "name": "执行步骤",
+                "overrides": {"设置": {"音量": "", "模式": "静音"}},
+            },
+        ],
+    }
+
+    created = client.post("/api/tasks", json=payload)
+    assert created.status_code == 201
+
+    details = client.get(f"/api/tasks/{created.json()['id']}/parameters")
+
+    assert details.status_code == 200
+    assert details.json()["steps"] == [
+        {
+            "step_index": 0,
+            "name": "准备步骤",
+            "override": {"设置": {"音量": 80}},
+            "effective": {"设置": {"音量": 80, "模式": "影院"}, "音乐": "流行"},
+        },
+        {
+            "step_index": 1,
+            "name": "执行步骤",
+            "override": {"设置": {"音量": "", "模式": "静音"}},
+            "effective": {"设置": {"音量": 80, "模式": "静音"}, "音乐": "流行"},
+        },
+    ]
